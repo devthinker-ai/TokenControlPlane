@@ -74,11 +74,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Docker image (self-hosted + SaaS)
-      # latest = newest release tag (including patches). Do NOT gate on is_default_branch —
-      # tag pushes set is_default_branch=false and would never publish :latest.
-      # Image path must be lowercase (GHCR requirement). github.repository keeps
-      # TokenControlPlane casing — pin owner + package explicitly.
+      # Docker image (self-hosted).
+      # GITHUB_TOKEN alone keeps failing with permission_denied: write_package on this
+      # account even with packages:write — use a classic PAT in secret GHCR_TOKEN
+      # (scopes: write:packages, read:packages). Fallback to GITHUB_TOKEN if unset.
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -88,12 +87,14 @@ jobs:
             type=ref,event=tag
             type=raw,value=latest
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true

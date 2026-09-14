@@ -34,16 +34,20 @@ Operator manual for cutting a release from a laptop (tag → CI → publish → 
    git push origin main
    git push origin vX.Y.Z
    ```
-7. **One-time GHCR setup** (required or Docker push fails with `permission_denied: write_package`):
-   - Repo → **Settings → Actions → General → Workflow permissions** → **Read and write permissions** → Save.
-   - The workflow already declares `permissions: packages: write`; the repo toggle must allow the token to use it.
+7. **One-time GHCR setup** (required — without this, Docker push fails with `permission_denied: write_package`):
+   1. Create a **classic** PAT: https://github.com/settings/tokens/new  
+      Scopes: `write:packages`, `read:packages` (and `delete:packages` optional).
+   2. Repo → **Settings → Secrets and variables → Actions** → New repository secret:  
+      Name `GHCR_TOKEN`, value = the PAT.
+   3. Also set **Settings → Actions → General → Workflow permissions** → **Read and write permissions**.
+   4. If an old orphaned package blocks pushes: https://github.com/users/devthinker-ai/packages → delete `tokencontrolplane` if present, then re-run.
 8. CI (`.github/workflows/release.yml`) will:
    - `npm ci && npm run build`
    - `go vet ./...` + `go test ./...`
    - Extract changelog section for the tag (**fails** if missing)
    - Cross-compile 4 platforms + `SHA256SUMS`
    - `gh release create` with that section as notes (idempotent on re-run)
-   - Push multi-arch Docker image to `ghcr.io/devthinker-ai/tokencontrolplane:vX.Y.Z` **and** `:latest`
+   - Push multi-arch Docker image to `ghcr.io/devthinker-ai/tokencontrolplane:vX.Y.Z` **and** `:latest` (auth via `GHCR_TOKEN`)
 9. Verify:
    ```bash
    gh release view vX.Y.Z          # assets + notes from CHANGELOG
