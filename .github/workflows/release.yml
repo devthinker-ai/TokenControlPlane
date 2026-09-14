@@ -61,21 +61,29 @@ jobs:
 
       - name: GitHub Release
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "TokenControlPlane ${GITHUB_REF_NAME}" \
-            --notes-file "${{ steps.notes.outputs.path }}" \
-            dist/*
+          # Idempotent: re-running after a partial failure (e.g. GHCR push) must not
+          # fail because the release + assets already exist from the first attempt.
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" dist/* --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "TokenControlPlane ${GITHUB_REF_NAME}" \
+              --notes-file "${{ steps.notes.outputs.path }}" \
+              dist/*
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Docker image (self-hosted + SaaS)
       # latest = newest release tag (including patches). Do NOT gate on is_default_branch —
       # tag pushes set is_default_branch=false and would never publish :latest.
+      # Image path must be lowercase (GHCR requirement). github.repository keeps
+      # TokenControlPlane casing — pin owner + package explicitly.
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ github.repository_owner }}/tokencontrolplane
           tags: |
             type=ref,event=tag
             type=raw,value=latest
@@ -83,7 +91,7 @@ jobs:
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:

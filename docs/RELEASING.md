@@ -34,14 +34,17 @@ Operator manual for cutting a release from a laptop (tag → CI → publish → 
    git push origin main
    git push origin vX.Y.Z
    ```
-7. CI (`.github/workflows/release.yml`) will:
+7. **One-time GHCR setup** (required or Docker push fails with `permission_denied: write_package`):
+   - Repo → **Settings → Actions → General → Workflow permissions** → **Read and write permissions** → Save.
+   - The workflow already declares `permissions: packages: write`; the repo toggle must allow the token to use it.
+8. CI (`.github/workflows/release.yml`) will:
    - `npm ci && npm run build`
    - `go vet ./...` + `go test ./...`
    - Extract changelog section for the tag (**fails** if missing)
    - Cross-compile 4 platforms + `SHA256SUMS`
-   - `gh release create` with that section as notes
+   - `gh release create` with that section as notes (idempotent on re-run)
    - Push multi-arch Docker image to `ghcr.io/devthinker-ai/tokencontrolplane:vX.Y.Z` **and** `:latest`
-8. Verify:
+9. Verify:
    ```bash
    gh release view vX.Y.Z          # assets + notes from CHANGELOG
    docker pull ghcr.io/devthinker-ai/tokencontrolplane:vX.Y.Z
@@ -51,7 +54,7 @@ Operator manual for cutting a release from a laptop (tag → CI → publish → 
    tokencontrolplane update              # or update --file … --sha256 …
    tokencontrolplane version
    ```
-9. Announce the release (changelog + GitHub Release notes).
+10. Announce the release (changelog + GitHub Release notes).
 
 ### Docker vs binary
 
