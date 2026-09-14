@@ -1,0 +1,37 @@
+# Release cross-compile output
+/dist/
+
+# Binaries
+/gateway
+/bin/
+*.exe
+
+# Internal Cursor phase prompts (local only)
+/prompts/
+
+# Internal agent rules (local only)
+/AGENTS.md
+
+# SQLite
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.db.backup
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Frontend (later phases)
+frontend/node_modules/
+frontend/dist/
+
+# Env / secrets
+.env
+*.pem
+*.key
+!*.key.example
+# Public license verification key is shipped in-tree (private key never is).
+!pkg/license/license_pub.pem

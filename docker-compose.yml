@@ -1,0 +1,22 @@
+services:
+  tokencontrolplane:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ADDR: ":8080"
+      DB_PATH: /data/gateway.db
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      GATEWAY_URL: ${GATEWAY_URL:-http://localhost:8080}
+      TOKENCONTROLPLANE_LICENSE_KEY: ${TOKENCONTROLPLANE_LICENSE_KEY:-}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  # Optional smoke-test upstream (replace with a real remote MCP server URL in the dashboard).
+  # Example placeholder — not a real MCP server; wire your GitHub MCP / other streamable-HTTP endpoint
+  # via the dashboard after register.
+  # github-mcp:
+  #   image: ghcr.io/example/github-mcp:latest
+  #   profiles: ["examples"]

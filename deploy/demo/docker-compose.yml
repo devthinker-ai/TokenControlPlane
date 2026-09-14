@@ -1,0 +1,35 @@
+# Demo deploy — joins an existing traefik-net; does not touch other stacks.
+# Set GATEWAY_URL / GATEWAY_HOST to your public hostname before up.
+services:
+  tokencontrolplane:
+    image: tokencontrolplane:demo
+    build: .
+    restart: unless-stopped
+    environment:
+      ADDR: ":8080"
+      DB_PATH: /data/gateway.db
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      GATEWAY_URL: ${GATEWAY_URL:-http://localhost:8080}
+      DISABLE_REGISTER: ${DISABLE_REGISTER:-1}
+    volumes:
+      - ./data:/data
+    networks:
+      - traefik-net
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.services.tokencontrolplane.loadbalancer.server.port=8080
+      - traefik.http.routers.tokencontrolplane.rule=Host(`${GATEWAY_HOST:-localhost}`)
+      - traefik.http.routers.tokencontrolplane.entrypoints=websecure
+      - traefik.http.routers.tokencontrolplane.tls.certresolver=le
+      - traefik.http.routers.tokencontrolplane-cloud.rule=Host(`mcp.10e7wbd.cserverhost.cloud`)
+      - traefik.http.routers.tokencontrolplane-cloud.entrypoints=websecure
+      - traefik.http.routers.tokencontrolplane-cloud.tls.certresolver=le
+      - traefik.http.routers.tokencontrolplane-cloud.tls.domains[0].main=10e7wbd.cserverhost.cloud
+      - traefik.http.routers.tokencontrolplane-cloud.tls.domains[0].sans=hermes-agent.10e7wbd.cserverhost.cloud,openclaw.10e7wbd.cserverhost.cloud,n8n.10e7wbd.cserverhost.cloud,vaultwarden.10e7wbd.cserverhost.cloud,mcp.10e7wbd.cserverhost.cloud
+      - traefik.http.routers.tokencontrolplane-cloud.service=tokencontrolplane
+
+networks:
+  traefik-net:
+    external: true

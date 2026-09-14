@@ -1,0 +1,93 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Frontend (embedded dashboard)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: |
+          cd frontend && npm ci && npm run build
+
+      # No tests → no tag. Broken releases are unrecoverable (tags immutable).
+      - name: Test
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Extract changelog
+        id: notes
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          NOTES_FILE="${RUNNER_TEMP}/release-notes.md"
+          if ! bash scripts/extract-changelog.sh "$TAG" CHANGELOG.md > "$NOTES_FILE"; then
+            echo "CHANGELOG.md has no entry for ${TAG} — add one"
+            exit 1
+          fi
+          echo "path=${NOTES_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Cross-compile
+        env:
+          LDFLAGS: "-X main.version=${GITHUB_REF_NAME#v} -X main.commit=${GITHUB_SHA::7} -X main.built=${GITHUB_RUN_ID}"
+        run: |
+          mkdir -p dist
+          for target in darwin-arm64 darwin-amd64 linux-amd64 linux-arm64; do
+            os=${target%-*}; arch=${target#*-}
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$LDFLAGS" \
+              -o dist/tokencontrolplane_${target} ./cmd/gateway
+          done
+          (cd dist && shasum -a 256 tokencontrolplane_* > SHA256SUMS)
+
+      - name: GitHub Release
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "TokenControlPlane ${GITHUB_REF_NAME}" \
+            --notes-file "${{ steps.notes.outputs.path }}" \
+            dist/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker image (self-hosted + SaaS)
+      # latest = newest release tag (including patches). Do NOT gate on is_default_branch —
+      # tag pushes set is_default_branch=false and would never publish :latest.
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          platforms: linux/amd64,linux/arm64
