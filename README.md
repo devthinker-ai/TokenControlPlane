@@ -2,6 +2,14 @@
 
 **Stop runaway agents.** One gateway in front of all your agent traffic — MCP tools **and** LLM models — one budget, one kill switch. Sits between AI clients (Cursor, Claude Desktop, Windsurf) and remote MCP servers / OpenAI-compatible model APIs; hard token budgets; a single static Go binary.
 
+## What problem does this solve?
+
+AI agents can make many tool and model calls without a single place to control the total amount of traffic they generate.
+
+With MCP, an agent may call multiple tools repeatedly, and with LLM APIs those calls can also consume significant token budgets. Controls implemented independently inside each client or MCP server make it difficult to enforce a shared budget, revoke access immediately, or see usage across tools and models.
+
+TokenControlPlane puts a gateway between AI clients and their MCP servers / OpenAI-compatible LLM APIs.
+
 Source: [github.com/devthinker-ai/TokenControlPlane](https://github.com/devthinker-ai/TokenControlPlane)
 
 ![Overview — MCP and LLM usage under one budget](docs/screenshots/overview.png)
